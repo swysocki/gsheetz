@@ -4,6 +4,7 @@ from itertools import groupby
 from googleapiclient import discovery
 from google.oauth2 import service_account
 
+CREDENTIALS_FILE = "eco-groove-150118-d033e728779d.json"
 FILENAME = "tournament_data.json"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SHEET_ID = "1yNN5YVlD9Eb0H1P54T3DpQNzAojUnSGCXD83_Tn23uU"
@@ -33,7 +34,7 @@ def get_data_fields(fields):
     return tourn_fields, result_fields
 
 
-def aggregate_results(tourn_list):
+def aggregate_results(tourn_list, sheet_name):
     """
     Group list by year, location, name, division, format
     Assume the items are sorted so that the whole list will not be iterated for
@@ -43,6 +44,7 @@ def aggregate_results(tourn_list):
       'year': 2016,
       'location': 'New York, NY',
       'name': 'My Tourn',
+      'league': $sheet_name,
       'results': [
         {
           'format':'10-man',
@@ -58,7 +60,7 @@ def aggregate_results(tourn_list):
 
     t_list = []
     for g1, v1 in groupby(tourn_list, t_getter):
-        tourn = {"year": g1[0], "location": g1[1], "name": g1[2], "results": []}
+        tourn = {"year": g1[0], "location": g1[1], "name": g1[2], "league": sheet_name, "results": []}
         for g2, v2 in groupby(v1, p_getter):
             tourn["results"].append(
                 {"division": g2[0], "format": g2[1], "team": g2[2], "place": g2[3]}
@@ -95,14 +97,14 @@ def get_spreadsheet_title(service):
 
 if __name__ == "__main__":
     credentials = service_account.Credentials.from_service_account_file(
-        "eco-groove-150118-d033e728779d.json", scopes=SCOPES
+        CREDENTIALS_FILE, scopes=SCOPES
     )
     service = discovery.build("sheets", "v4", credentials=credentials)
     sheet_ids = get_spreadsheet_title(service)
     tourn_list = []
     for sheet in sheet_ids:
         tournamentd_data = get_sheet_data(service, sheet)
-        tournament_list = aggregate_results(tournamentd_data.get("values"))
+        tournament_list = aggregate_results(tournamentd_data.get("values"), sheet[0])
         tourn_list.extend(tournament_list)
     with open(FILENAME, "w") as df:
         json.dump(tourn_list, df)
